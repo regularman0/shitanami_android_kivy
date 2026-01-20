@@ -23,7 +23,7 @@ version = 1.0.0
 
 # (list) Application requirements
 # ВАЖНО: certifi нужен для работы SSL/HTTPS в requests на Android
-requirements = python3,kivy,requests,urllib3,certifi,idna,charset_normalizer
+requirements = python3,kivy,requests,urllib3,certifi,idna,charset_normalizer,jnius,pyjnius,android
 
 # (str) Custom source folders for requirements
 # (list) Permissions

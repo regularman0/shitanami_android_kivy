@@ -1,37 +1,38 @@
 # Path: mobile_app/core/mobile_schema.py
-# Version: Kivy_1.0
-# Description: Пути к файлам. Адаптировано для Kivy/Buildozer.
+# Version: Kivy_1.2
+# Description: Пути к файлам. Исправлено добавление DRAFT_PATH.
 
 import os
 import sys
-import platform
+from kivy.utils import platform
 
 def get_writable_root():
-    # Проверка на Android (Kivy выставляет переменную окружения)
-    if "ANDROID_ARGUMENT" in os.environ:
-        # На Android пишем во внутреннюю память приложения
-        # Обычно это /data/user/0/org.test.myapp/files/
-        return os.path.expanduser("~")
+    # 1. Android
+    if platform == 'android':
+        from jnius import autoclass
+        PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        activity = PythonActivity.mActivity
+        return activity.getFilesDir().getAbsolutePath()
     
-    # На ПК (Windows/Linux) пишем в папку config рядом с кодом
-    # Чтобы не засорять корень, поднимемся на уровень выше от core/
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return base_dir
+    # 2. ПК (Windows/Linux)
+    current_file = os.path.abspath(__file__)
+    core_dir = os.path.dirname(current_file)
+    app_dir = os.path.dirname(core_dir)
+    root_dir = os.path.dirname(app_dir)
+    return root_dir
 
 DATA_ROOT = get_writable_root()
 CONFIG_DIR = os.path.join(DATA_ROOT, "config")
 
-# Создаем папку, если нужно (и если есть права)
-try:
-    if not os.path.exists(CONFIG_DIR):
+if not os.path.exists(CONFIG_DIR):
+    try:
         os.makedirs(CONFIG_DIR)
-    print(f"[SYS LOG] Config dir checked at: {CONFIG_DIR}")
-except Exception as e:
-    print(f"[SYS LOG] Error creating config dir: {e}")
+    except OSError:
+        pass
 
-# Пути к файлам
 FAS_PATH = os.path.join(CONFIG_DIR, "fas.json")
 DB_PATH = os.path.join(CONFIG_DIR, "mobile_data.db")
-DRAFT_PATH = os.path.join(CONFIG_DIR, "draft_state.json") # Новое: файл черновика
+SETTINGS_FILE = os.path.join(CONFIG_DIR, "app_settings.json")
+DRAFT_PATH = os.path.join(CONFIG_DIR, "draft_state.json") # <--- ДОБАВЛЕНО
 
-print(f"[SYS LOG] Paths initialized. DB: {DB_PATH}")
+print(f"[SYS LOG] Paths initialized. Config dir: {CONFIG_DIR}")

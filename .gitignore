@@ -22,3 +22,6 @@ Thumbs.db
 
 # Config folder
 config/
+
+# Other
+mobile_app/bin
