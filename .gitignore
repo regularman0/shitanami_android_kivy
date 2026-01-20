@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+
+# Buildozer
+.buildozer/
+bin/
+
+# Android build artifacts
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Config folder
+config/
