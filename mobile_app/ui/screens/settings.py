@@ -1,6 +1,6 @@
 # Path: mobile_app/ui/screens/settings.py
-# Version: Kivy_1.1
-# Description: Экран настроек. Исправлен AttributeError _get_sync и добавлена анимация статуса.
+# Version: Kivy_1.3
+# Description: Экран настроек. Исправлен краш при биндинге высоты лейбла.
 
 import threading
 import json
@@ -43,7 +43,7 @@ class SettingsScreen(BaseScreen):
         ip_box.add_widget(Label(text="IP Сервера (ПК):", color=(0.3,0.3,0.3,1), 
                                 size_hint_y=None, height='20dp', halign='left', text_size=(self.width, None)))
         
-        saved_ip = self.store.get('network')['ip'] if self.store.exists('network') else "http://192.168.1.X:8000"
+        saved_ip = self.store.get('network')['ip'] if self.store.exists('network') else "http://192.168.0.103:8000"
         self.ti_ip = TextInput(text=saved_ip, multiline=False, size_hint_y=None, height='40dp', font_size='16sp', write_tab=False)
         ip_box.add_widget(self.ti_ip)
         self.layout.add_widget(ip_box)
@@ -83,10 +83,27 @@ class SettingsScreen(BaseScreen):
         self.lbl_status = Label(text="Ожидание...", color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height='30dp', bold=True)
         self.layout.add_widget(self.lbl_status)
 
-        scroll = ScrollView(size_hint=(1, 1))
-        self.lbl_log = Label(text="Лог операций...", color=(0,0,0,1), font_name="Roboto", 
-                             font_size='11sp', size_hint_y=None, valign='top')
-        self.lbl_log.bind(texture_size=self.lbl_log.setter('size'))
+        # --- ИСПРАВЛЕНИЕ ЛОГА (Scroll + Wrap) ---
+        scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
+        
+        self.lbl_log = Label(
+            text="Лог операций...", 
+            color=(0,0,0,1), 
+            font_name="Roboto", 
+            font_size='11sp', 
+            size_hint_y=None, 
+            halign='left', 
+            valign='top'
+        )
+        
+        # 1. При изменении ширины контейнера обновляем text_size лейбла
+        self.lbl_log.bind(width=lambda *x: self.lbl_log.setter('text_size')(self.lbl_log, (self.lbl_log.width, None)))
+        
+        # 2. ИСПРАВЛЕНО: При изменении текстуры берем только ВЫСОТУ (индекс 1)
+        def update_height(instance, value):
+            instance.height = value[1]
+            
+        self.lbl_log.bind(texture_size=update_height)
         
         scroll.add_widget(self.lbl_log)
         self.layout.add_widget(scroll)

@@ -28,6 +28,10 @@ requirements = python3,kivy,requests,urllib3,certifi,idna,charset_normalizer,jni
 # (str) Custom source folders for requirements
 # (list) Permissions
 permissions = INTERNET
+android.allow_cleartext = True
+
+# Разрешаем Cleartext Traffic (HTTP) для работы с локальным IP
+android.manifest.application_attributes = android:usesCleartextTraffic="true"
 
 # (int) Target Android API, should be as high as possible.
 android.api = 34
