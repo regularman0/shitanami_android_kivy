@@ -1,6 +1,6 @@
 # Path: mobile_app/ui/screens/settings.py
-# Version: Kivy_1.3
-# Description: Экран настроек. Исправлен краш при биндинге высоты лейбла.
+# Version: Kivy_1.5
+# Description: Экран настроек. Лог переведен на TextInput для гарантированного отображения ошибок.
 
 import threading
 import json
@@ -12,7 +12,6 @@ from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.scrollview import ScrollView
 from kivy.clock import mainthread, Clock
 from kivy.storage.jsonstore import JsonStore
 from kivy.logger import Logger
@@ -28,7 +27,7 @@ class SettingsScreen(BaseScreen):
         self.name = "settings"
         
         self.store = JsonStore(os.path.join(mobile_schema.CONFIG_DIR, 'app_settings.json'))
-        self.blink_event = None # Для анимации
+        self.blink_event = None 
         
         self.layout = BoxLayout(orientation='vertical', padding=15, spacing=15)
         self.add_widget(self.layout)
@@ -83,30 +82,19 @@ class SettingsScreen(BaseScreen):
         self.lbl_status = Label(text="Ожидание...", color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height='30dp', bold=True)
         self.layout.add_widget(self.lbl_status)
 
-        # --- ИСПРАВЛЕНИЕ ЛОГА (Scroll + Wrap) ---
-        scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
-        
-        self.lbl_log = Label(
+        # --- ИСПРАВЛЕНИЕ ЛОГА (TextInput) ---
+        # Используем TextInput в режиме readonly вместо Label.
+        # Это решает все проблемы с обрезанием текста, скроллом и ошибками размеров.
+        self.ti_log = TextInput(
             text="Лог операций...", 
-            color=(0,0,0,1), 
-            font_name="Roboto", 
-            font_size='11sp', 
-            size_hint_y=None, 
-            halign='left', 
-            valign='top'
+            readonly=True, 
+            font_family="Roboto",
+            font_size='11sp',
+            size_hint=(1, 1), # Занимает все оставшееся место
+            background_color=(0.95, 0.95, 0.95, 1),
+            foreground_color=(0, 0, 0, 1)
         )
-        
-        # 1. При изменении ширины контейнера обновляем text_size лейбла
-        self.lbl_log.bind(width=lambda *x: self.lbl_log.setter('text_size')(self.lbl_log, (self.lbl_log.width, None)))
-        
-        # 2. ИСПРАВЛЕНО: При изменении текстуры берем только ВЫСОТУ (индекс 1)
-        def update_height(instance, value):
-            instance.height = value[1]
-            
-        self.lbl_log.bind(texture_size=update_height)
-        
-        scroll.add_widget(self.lbl_log)
-        self.layout.add_widget(scroll)
+        self.layout.add_widget(self.ti_log)
 
     # ================= LOGIC =================
 
@@ -118,9 +106,8 @@ class SettingsScreen(BaseScreen):
         Logger.info("[SETTINGS] Saved")
 
     def _get_sync(self):
-        # FIX: метод переименован (был _get_sync_manager) и реализован
         ip = self.ti_ip.text.strip()
-        self.save_settings() # Save current IP
+        self.save_settings() 
         return Synchronizer(ip)
 
     # --- Animation ---
@@ -136,9 +123,7 @@ class SettingsScreen(BaseScreen):
             self.blink_event = None
 
     def _blink_tick(self, dt):
-        # Мигаем прозрачностью или цветом
         current = self.lbl_status.color
-        # Если оранжевый -> серый, иначе -> оранжевый
         if current[0] > 0.8: 
             self.lbl_status.color = (0.5, 0.5, 0.5, 1)
         else:
@@ -155,7 +140,10 @@ class SettingsScreen(BaseScreen):
             ok, msg = sync.client.check_connection()
             self._update_status_ui(ok, msg)
         except Exception as e:
-            self._update_status_ui(False, f"Internal Error: {e}")
+            # Преобразуем ошибку в строку полностью
+            import traceback
+            full_error = f"{str(e)}\n{traceback.format_exc()}"
+            self._update_status_ui(False, full_error)
 
     @mainthread
     def _update_status_ui(self, ok, msg):
@@ -164,14 +152,16 @@ class SettingsScreen(BaseScreen):
             srv = msg.get('server', 'Unknown') if isinstance(msg, dict) else 'Unknown'
             self.lbl_status.text = f"Успешно: {srv}"
             self.lbl_status.color = (0, 0.7, 0, 1)
+            self.ti_log.text = f"Подключено к {srv}\nОтвет: {msg}"
         else:
-            self.lbl_status.text = f"Ошибка: {msg}"
+            self.lbl_status.text = "Ошибка связи"
             self.lbl_status.color = (0.8, 0, 0, 1)
+            self.ti_log.text = str(msg) # Полный текст ошибки теперь здесь
 
     # --- Sync DB ---
     def do_sync(self, instance):
         self._start_blink("Синхронизация...")
-        self.lbl_log.text = "Запуск..."
+        self.ti_log.text = "Запуск..."
         threading.Thread(target=self._sync_thread).start()
 
     def _sync_thread(self):
@@ -180,12 +170,13 @@ class SettingsScreen(BaseScreen):
             ok, logs = sync.sync_now()
             self._update_sync_ui(ok, logs)
         except Exception as e:
-            self._update_sync_ui(False, [f"Fatal Error: {e}"])
+            import traceback
+            self._update_sync_ui(False, [f"Fatal Error: {e}", traceback.format_exc()])
 
     @mainthread
     def _update_sync_ui(self, ok, logs):
         self._stop_blink()
-        self.lbl_log.text = "\n".join(logs)
+        self.ti_log.text = "\n".join(logs)
         if ok:
             self.lbl_status.text = "Синхронизация завершена"
             self.lbl_status.color = (0, 0.7, 0, 1)
@@ -202,19 +193,14 @@ class SettingsScreen(BaseScreen):
         try:
             client = self._get_sync().client
             
-            # 1. Check Hash
             server_hash = client.get_config_hash()
             if not server_hash:
                 self._update_download_ui(False, "Нет связи или хэша")
                 return
-
-            # 2. Compare with local (if implemented stored hash)
-            # Для простоты - качаем всегда, если нажали кнопку
             
             conf = client.get_config()
             if conf:
                 try:
-                    # Пишем файл
                     with open(mobile_schema.FAS_PATH, "w", encoding="utf-8") as f:
                         json.dump(conf, f, ensure_ascii=False, indent=4)
                     self._update_download_ui(True, "FAS обновлен!")
@@ -223,10 +209,12 @@ class SettingsScreen(BaseScreen):
             else:
                 self._update_download_ui(False, "Ошибка скачивания JSON")
         except Exception as e:
-             self._update_download_ui(False, f"Error: {e}")
+             import traceback
+             self._update_download_ui(False, f"Error: {e}\n{traceback.format_exc()}")
 
     @mainthread
     def _update_download_ui(self, ok, msg):
         self._stop_blink()
-        self.lbl_status.text = msg
+        self.lbl_status.text = "Готово" if ok else "Ошибка"
         self.lbl_status.color = (0, 0.7, 0, 1) if ok else (0.8, 0, 0, 1)
+        self.ti_log.text = msg
